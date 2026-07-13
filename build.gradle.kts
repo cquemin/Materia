@@ -291,6 +291,11 @@ kotlin {
         }
     }
 
+        // ai-assistant patch: ios/macos targets are only created on non-Windows hosts
+        // (see the `if (!hostOs.contains("win"))` target block above), but this native
+        // source-set wiring ran unconditionally and failed with "iosX64Main not found"
+        // on Windows. Guard it so JVM/JS targets can still configure on Windows dev boxes.
+        if (!System.getProperty("os.name").lowercase().contains("win")) {
         val nativeMain by creating {
             dependsOn(commonMain)
         }
@@ -355,6 +360,7 @@ kotlin {
         val macosArm64Test by getting {
             dependsOn(macosTest)
         }
+        } // end ai-assistant Windows guard for native (ios/macos) source sets
 
         // Linux Target - Disabled
         // val linuxX64Main by getting {
