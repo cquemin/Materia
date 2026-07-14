@@ -1,0 +1,87 @@
+name: Publish to GitHub Packages
+
+# Manual-only: publishes materia, materia-engine, and materia-gpu binaries to
+# https://maven.pkg.github.com/cquemin/Materia so downstream apps (e.g. ai-assistant)
+# can consume them as Maven/Gradle dependencies instead of a source checkout.
+#
+# This is separate from .github/workflows/publish.yml (Maven Central release on tag push,
+# GPG-signed). GitHub Packages publishing does NOT require signing -- the root
+# build.gradle.kts only makes signing required when the literal `publish` task is in the
+# task graph (`gradle.taskGraph.hasTask("publish")`), and the tasks invoked below are
+# `publish*ToGitHubPackagesRepository`, not `publish`. materia-engine and materia-gpu never
+# apply the signing plugin at all. The `-x sign*Publication` excludes below are a defensive
+# belt-and-braces measure in case that gate is ever loosened.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.vfs.watch=false"
+  GITHUB_ACTOR: ${{ github.actor }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  # jvm / js / android / common-metadata variants build on any host; ubuntu is cheapest.
+  # Kotlin/JVM compilation for this project requires JDK 22.
+  jvm-js-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin JDK 22
+        uses: actions/setup-java@v4
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permissions
+        run: chmod +x gradlew
+
+      - name: Publish jvm/js/android/metadata publications to GitHub Packages
+        run: |
+          ./gradlew --no-daemon --stacktrace \
+            publishAllPublicationsToGitHubPackagesRepository \
+            -x signJvmPublication \
+            -x signJsPublication \
+            -x signKotlinMultiplatformPublication
+
+  # ios/macos (Kotlin/Native "apple" targets) only exist on the root build.gradle.kts,
+  # materia-engine, and materia-gpu when the host OS is not Windows (see the
+  # `if (!hostOs.contains("win"))` / `if (!hostOs.startsWith("Windows"))` guards in each
+  # module's build.gradle.kts) -- so this job MUST run on macos-latest; it cannot build on
+  # ubuntu or Windows runners. Also needs JDK 22 for the Kotlin/Gradle toolchain.
+  apple:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin JDK 22
+        uses: actions/setup-java@v4
+        with:
+          java-version: '22'
+          distribution: 'temurin'
+
+      - name: Grant execute permissions
+        run: chmod +x gradlew
+
+      - name: Publish ios/macos publications to GitHub Packages
+        run: |
+          ./gradlew --no-daemon --stacktrace \
+            publishIosArm64PublicationToGitHubPackagesRepository \
+            publishIosX64PublicationToGitHubPackagesRepository \
+            publishIosSimulatorArm64PublicationToGitHubPackagesRepository \
+            publishMacosArm64PublicationToGitHubPackagesRepository \
+            publishMacosX64PublicationToGitHubPackagesRepository \
+            -x signIosArm64Publication \
+            -x signIosX64Publication \
+            -x signIosSimulatorArm64Publication \
+            -x signMacosArm64Publication \
+            -x signMacosX64Publication

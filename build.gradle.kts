@@ -1,4 +1,5 @@
 import com.android.build.api.dsl.LibraryExtension
+import org.gradle.api.publish.PublishingExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import java.security.MessageDigest
 import java.util.*
@@ -32,6 +33,25 @@ allprojects {
     tasks.matching { it.name == "commonizeNativeDistribution" }.configureEach {
         enabled = !disableNativeCommonization
     }
+
+    // ai-assistant patch: publish every module that applies maven-publish (root `materia`,
+    // `materia-engine`, `materia-gpu`) to GitHub Packages. Defined once here instead of
+    // duplicating a `repositories { maven { ... } }` block in each module's `publishing { }`.
+    // Works both in CI (env vars) and locally (gradle.properties `gpr.user` / `gpr.key`).
+    plugins.withId("maven-publish") {
+        extensions.configure<PublishingExtension> {
+            repositories {
+                maven {
+                    name = "GitHubPackages"
+                    url = uri("https://maven.pkg.github.com/cquemin/Materia")
+                    credentials {
+                        username = System.getenv("GITHUB_ACTOR") ?: (findProperty("gpr.user") as String?)
+                        password = System.getenv("GITHUB_TOKEN") ?: (findProperty("gpr.key") as String?)
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Apply plugins to all subprojects
@@ -41,6 +61,20 @@ subprojects {
     if (name.startsWith("tools")) {
         group = "io.materia.tools"
         version = rootProject.version
+    }
+
+    // ai-assistant patch: materia-engine and materia-gpu are published to GitHub Packages
+    // alongside the root `materia` artifact, so the downstream app can depend on
+    // `codes.yousef:materia-engine` / `codes.yousef:materia-gpu` binaries. Their Gradle
+    // project names already produce the desired default KMP artifactIds
+    // (materia-engine, materia-engine-js, materia-gpu-jvm, ...), so no artifactId
+    // remapping is needed here -- only the maven-publish plugin and matching
+    // group/version (io.materia.* remains the Kotlin/Android package namespace,
+    // unrelated to the Maven groupId).
+    if (name == "materia-engine" || name == "materia-gpu") {
+        group = rootProject.group
+        version = rootProject.version
+        apply(plugin = "maven-publish")
     }
 
     plugins.withId("org.jetbrains.kotlin.multiplatform") {
