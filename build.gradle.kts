@@ -203,6 +203,7 @@ kotlin {
 
     // Android Target
     androidTarget {
+        publishLibraryVariants("release") // ai-assistant patch: publish the android variant
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
             freeCompilerArgs.add("-Xexpect-actual-classes")
