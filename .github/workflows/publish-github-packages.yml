@@ -41,6 +41,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      # :compileShaders (root build.gradle.kts) needs a WGSL compiler on PATH to
+      # transpile shaders for the js/jvm GPU backends. Ubuntu runners ship Rust,
+      # so naga-cli is the cheapest way to provide one. ~/.cargo/bin is already on
+      # PATH for subsequent steps on GitHub-hosted runners.
+      - name: Install naga-cli (WGSL compiler)
+        run: cargo install naga-cli --locked
+
       - name: Grant execute permissions
         run: chmod +x gradlew
 
