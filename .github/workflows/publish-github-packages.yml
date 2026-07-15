@@ -45,9 +45,18 @@ jobs:
         run: chmod +x gradlew
 
       - name: Publish jvm/js/android/metadata publications to GitHub Packages
+        # Explicit (non-Apple) publications only. `publishAll` would include the ios/macos
+        # variants — those targets are created on Linux (the non-Windows guard) but cannot
+        # COMPILE on a Linux host, so publishAll would fail. The Apple variants are published
+        # by the `apple` (macOS) job. The metadata (kotlinMultiplatform) module published
+        # here already references the Apple variants (targets are declared on Linux), so the
+        # combined result is complete.
         run: |
           ./gradlew --no-daemon --stacktrace \
-            publishAllPublicationsToGitHubPackagesRepository \
+            publishKotlinMultiplatformPublicationToGitHubPackagesRepository \
+            publishJvmPublicationToGitHubPackagesRepository \
+            publishJsPublicationToGitHubPackagesRepository \
+            publishAndroidReleasePublicationToGitHubPackagesRepository \
             -x signJvmPublication \
             -x signJsPublication \
             -x signKotlinMultiplatformPublication
