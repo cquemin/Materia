@@ -1,0 +1,48 @@
+name: Publish wgpu4k namespace bridge
+
+# Manual-only. Republishes the two colliding wgpu4k Android AARs under
+# ai.assistant.thirdparty with corrected manifest namespaces, to the same
+# GitHub Packages repo (cquemin/Materia) that ai-assistant already consumes.
+#
+# TODO(sp1-wgpu4k-ns-bridge): delete this workflow when wgpu4k/wgpu4k and
+# wgpu4k/webgpu-ktypes publish unique Android namespaces upstream.
+#
+# GITHUB PACKAGES VERSIONS ARE IMMUTABLE. Verify with
+#   ./gradlew -p thirdparty/wgpu4k-namespace-fix publishAllPublicationsToLocalBridgeRepoRepository
+# before dispatching this.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GITHUB_ACTOR: ${{ github.actor }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Temurin JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Grant execute permissions
+        run: chmod +x gradlew
+
+      # Repackage first and fail the job here if an upstream AAR ever starts
+      # shipping resources — the inertness assertion is what makes the rename safe.
+      - name: Repackage
+        run: ./gradlew --no-daemon --stacktrace -p thirdparty/wgpu4k-namespace-fix repackageAll
+
+      - name: Publish to GitHub Packages
+        run: |
+          ./gradlew --no-daemon --stacktrace -p thirdparty/wgpu4k-namespace-fix \
+            publishAllPublicationsToGitHubPackagesRepository
